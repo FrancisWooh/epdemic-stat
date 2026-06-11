@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>香港各区疫情 Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root{
+      --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;
+      --border:#30363d;--text:#e6edf3;--text2:#8b949e;
+      --blue:#58a6ff;--red:#f85149;--green:#3fb950;
+      --yellow:#d29922;--teal:#39d0d8;--purple:#bc8cff;--grey:#8b949e;
+    }
+
+    body{background:var(--bg);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+      min-height:100vh}
+
+    /* ── Header ── */
+    .hdr{
+      background:var(--surface);border-bottom:1px solid var(--border);
+      padding:14px 28px;display:flex;align-items:center;gap:12px;
+      position:sticky;top:0;z-index:200;
+    }
+    .hdr h1{font-size:17px;font-weight:600}
+    .hdr-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+    .badge{padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;
+      background:rgba(88,166,255,.15);color:var(--blue);border:1px solid rgba(88,166,255,.3)}
+    .hdr-date{font-size:12px;color:var(--text2)}
+
+    /* ── Nav tabs ── */
+    .nav{
+      background:var(--surface);border-bottom:1px solid var(--border);
+      padding:0 24px;display:flex;gap:0;
+    }
+    .nav-btn{
+      padding:12px 20px;border:none;background:transparent;
+      color:var(--text2);font-size:13px;cursor:pointer;
+      border-bottom:2px solid transparent;transition:all .15s;
+      font-family:inherit;white-space:nowrap;
+    }
+    .nav-btn:hover{color:var(--text)}
+    .nav-btn.on{color:var(--blue);border-bottom-color:var(--blue)}
+
+    /* ── Pages ── */
+    .page{display:none;padding:20px 24px;max-width:1600px;margin:0 auto}
+    .page.on{display:block}
+
+    /* ── KPI ── */
+    .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:16px 20px;position:relative;overflow:hidden;transition:border-color .2s}
+    .kpi:hover{border-color:var(--blue)}
+    .kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--blue))}
+    .kpi-lbl{font-size:11px;color:var(--text2);margin-bottom:6px}
+    .kpi-val{font-size:26px;font-weight:700;letter-spacing:-1px;color:var(--kc,var(--text))}
+    .kpi-sub{font-size:11px;color:var(--text2);margin-top:5px}
+
+    /* ── Section label ── */
+    .sec{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text2);
+      margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+    .sec::after{content:"";flex:1;height:1px;background:var(--border)}
+
+    /* ── Grid ── */
+    .grid{display:grid;gap:14px;margin-bottom:14px}
+    .g-3-2{grid-template-columns:3fr 2fr}
+    .g-2-1{grid-template-columns:2fr 1fr}
+    .g-1-1{grid-template-columns:1fr 1fr}
+    .g-full{grid-template-columns:1fr}
+
+    /* ── Card ── */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:16px 18px 10px;transition:border-color .2s}
+    .card:hover{border-color:rgba(88,166,255,.35)}
+    .card-title{font-size:13px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:7px}
+    .card-desc{font-size:11px;color:var(--text2);margin-bottom:10px}
+    .chart{width:100%}
+
+    /* ── Tabs ── */
+    .tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+    .tab{padding:3px 12px;border-radius:6px;border:1px solid var(--border);
+      background:transparent;color:var(--text2);font-size:12px;cursor:pointer;
+      transition:all .15s;font-family:inherit}
+    .tab:hover{border-color:var(--blue);color:var(--blue)}
+    .tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+    /* ── Map page layout ── */
+    .map-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start}
+    .map-main{display:flex;flex-direction:column;gap:14px}
+
+    /* ── Slider ── */
+    .slider-wrap{
+      background:var(--surface2);border:1px solid var(--border);
+      border-radius:8px;padding:14px 18px;
+    }
+    .slider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .slider-label{font-size:12px;color:var(--text2)}
+    .slider-date{font-size:14px;font-weight:600;color:var(--blue)}
+    input[type=range]{
+      width:100%;accent-color:var(--blue);cursor:pointer;
+      height:4px;border-radius:2px;outline:none;
+    }
+    .slider-ticks{display:flex;justify-content:space-between;
+      font-size:10px;color:var(--text2);margin-top:5px}
+
+    /* ── Play button ── */
+    .play-bar{display:flex;align-items:center;gap:10px;margin-top:10px}
+    .play-btn{
+      width:32px;height:32px;border-radius:50%;border:1px solid var(--border);
+      background:var(--surface2);color:var(--text);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;transition:all .15s;flex-shrink:0;
+    }
+    .play-btn:hover{border-color:var(--blue);color:var(--blue)}
+    .play-btn.playing{background:var(--blue);border-color:var(--blue);color:#fff}
+    .speed-lbl{font-size:11px;color:var(--text2)}
+    .speed-sel{background:var(--surface2);border:1px solid var(--border);
+      color:var(--text);font-size:11px;padding:3px 6px;border-radius:4px;
+      cursor:pointer;font-family:inherit}
+
+    /* ── District popup ── */
+    #district-panel{
+      background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:16px 18px;min-height:200px;
+    }
+    .dp-name{font-size:15px;font-weight:700;margin-bottom:4px}
+    .dp-risk{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:12px}
+    .dp-risk.低风险{background:rgba(63,185,80,.15);color:var(--green)}
+    .dp-risk.中风险{background:rgba(210,153,34,.15);color:var(--yellow)}
+    .dp-risk.高风险{background:rgba(248,81,73,.15);color:var(--red)}
+    .dp-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+    .dp-stat{background:var(--surface2);border-radius:6px;padding:8px 10px}
+    .dp-stat-lbl{font-size:10px;color:var(--text2);margin-bottom:3px}
+    .dp-stat-val{font-size:16px;font-weight:700;color:var(--text)}
+    #dp-spark{width:100%;height:120px}
+    .dp-hint{font-size:12px;color:var(--text2);text-align:center;padding:40px 0}
+
+    /* ── Legend strip ── */
+    .legend-strip{
+      display:flex;align-items:center;gap:10px;font-size:11px;color:var(--text2);
+      padding:6px 0;
+    }
+    .legend-bar{
+      flex:1;height:8px;border-radius:4px;
+      background:linear-gradient(to right,#0d2137,#1a4a7a,#2171b5,#6baed6,#f7941d,#e55050,#c0392b);
+    }
+
+    /* ── Error ── */
+    #err-banner{display:none;margin:10px 0;padding:10px 16px;
+      background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);
+      border-radius:8px;color:var(--red);font-size:13px}
+
+    @media(max-width:1100px){
+      .map-layout{grid-template-columns:1fr}
+      #district-panel{min-height:auto}
+    }
+    @media(max-width:960px){
+      .kpi-row{grid-template-columns:repeat(2,1fr)}
+      .g-3-2,.g-2-1,.g-1-1{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <span style="font-size:22px">🦠</span>
+  <h1>香港各区疫情数据 Dashboard</h1>
+  <div class="hdr-right">
+    <span class="badge">数据可视化</span>
+    <span class="hdr-date" id="hdr-date">加载中…</span>
+  </div>
+</header>
+
+<!-- ── Nav ── -->
+<nav class="nav">
+  <button class="nav-btn on" data-page="p-overview">📊 总览</button>
+  <button class="nav-btn"    data-page="p-map">🗺️ 地图热力</button>
+  <button class="nav-btn"    data-page="p-region">🏙️ 地区分析</button>
+  <button class="nav-btn"    data-page="p-heatmap">🔥 热力地图</button>
+</nav>
+
+<!-- ══════════════ PAGE: Overview ══════════════ -->
+<div id="p-overview" class="page on">
+  <div id="err-banner"></div>
+
+  <div class="kpi-row">
+    <div class="kpi" style="--kc:var(--red)">
+      <div class="kpi-lbl">🔴 累计确诊</div>
+      <div class="kpi-val" id="k-total">—</div>
+      <div class="kpi-sub" id="k-period">—</div>
+    </div>
+    <div class="kpi" style="--kc:var(--yellow)">
+      <div class="kpi-lbl">📈 单日峰值</div>
+      <div class="kpi-val" id="k-peak">—</div>
+      <div class="kpi-sub" id="k-peak-date">—</div>
+    </div>
+    <div class="kpi" style="--kc:var(--grey)">
+      <div class="kpi-lbl">💀 累计死亡</div>
+      <div class="kpi-val" id="k-death">—</div>
+      <div class="kpi-sub" id="k-death-rate">—</div>
+    </div>
+    <div class="kpi" style="--kc:var(--green)">
+      <div class="kpi-lbl">💚 累计康复</div>
+      <div class="kpi-val" id="k-recovered">—</div>
+      <div class="kpi-sub">统计期间康复合计</div>
+    </div>
+    <div class="kpi" style="--kc:var(--purple)">
+      <div class="kpi-lbl">🏙️ 统计地区</div>
+      <div class="kpi-val" id="k-regions">—</div>
+      <div class="kpi-sub" id="k-days">—</div>
+    </div>
+  </div>
+
+  <div class="sec">趋势分析</div>
+  <div class="grid g-3-2">
+    <div class="card">
+      <div class="card-title">📊 每日新增 & 7日均线</div>
+      <div class="card-desc">柱状图为每日数值，折线为7日中心移动平均；确诊视图包含 ARIMA(5,1,5) 未来5天预测（虚线）及95%置信区间</div>
+      <div class="tabs" id="tabs-daily">
+        <button class="tab on" data-mode="cases">确诊</button>
+        <button class="tab"    data-mode="deaths">死亡</button>
+        <button class="tab"    data-mode="recovered">康复</button>
+      </div>
+      <div id="c-daily" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📉 累计确诊 & 累计死亡</div>
+      <div class="card-desc">左轴累计确诊（面积），右轴累计死亡（虚线）</div>
+      <div id="c-cumulative" class="chart" style="height:346px"></div>
+    </div>
+  </div>
+
+  <div class="sec">地区概览</div>
+  <div class="grid g-3-2" style="margin-bottom:32px">
+    <div class="card">
+      <div class="card-title">📈 确诊最高 Top 6 地区每日趋势</div>
+      <div class="card-desc">点击图例可显示/隐藏单个地区</div>
+      <div id="c-trend" class="chart" style="height:280px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚦 风险等级变化趋势</div>
+      <div class="card-desc">高/中/低风险地区数量的堆叠变化</div>
+      <div id="c-risk" class="chart" style="height:280px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE: Map ══════════════ -->
+<div id="p-map" class="page">
+  <div class="sec">地图热力分析</div>
+  <div class="map-layout">
+
+    <div class="map-main">
+      <!-- 地图卡片 -->
+      <div class="card">
+        <div class="card-title">🗺️ 香港各区疫情地图</div>
+        <div class="card-desc">颜色越深数值越高；点击地区查看详细时间序列</div>
+        <div class="tabs" id="tabs-map">
+          <button class="tab on"  data-metric="新增确诊">新增确诊</button>
+          <button class="tab"     data-metric="累计确诊">累计确诊</button>
+          <button class="tab"     data-metric="新增死亡">新增死亡</button>
+          <button class="tab"     data-metric="累计死亡">累计死亡</button>
+          <button class="tab"     data-metric="发病率">发病率/10万</button>
+        </div>
+        <div id="c-map" class="chart" style="height:480px"></div>
+        <div class="legend-strip">
+          <span>低</span>
+          <div class="legend-bar"></div>
+          <span>高</span>
+        </div>
+      </div>
+
+      <!-- 时间轴控制器 -->
+      <div class="slider-wrap">
+        <div class="slider-head">
+          <span class="slider-label">📅 日期选择</span>
+          <span class="slider-date" id="map-date-label">—</span>
+        </div>
+        <input type="range" id="date-slider" min="0" value="0"/>
+        <div class="slider-ticks" id="slider-ticks"></div>
+        <div class="play-bar">
+          <button class="play-btn" id="play-btn" title="播放/暂停">▶</button>
+          <span class="speed-lbl">播放速度</span>
+          <select class="speed-sel" id="speed-sel">
+            <option value="600">慢速</option>
+            <option value="300" selected>正常</option>
+            <option value="100">快速</option>
+            <option value="50">极速</option>
+          </select>
+          <span class="speed-lbl" style="margin-left:auto;font-size:12px;color:var(--text2)" id="play-progress"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 地区详情面板 -->
+    <div id="district-panel">
+      <p class="dp-hint">👆 点击地图上的地区<br/>查看详细数据</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ PAGE: Region ══════════════ -->
+<div id="p-region" class="page">
+  <div class="sec">地区分析</div>
+  <div class="grid g-3-2">
+    <div class="card">
+      <div class="card-title">🏙️ 各地区疫情指标排名</div>
+      <div class="card-desc">切换指标查看各区排名</div>
+      <div class="tabs" id="tabs-region">
+        <button class="tab on"  data-mode="cumulative">累计确诊</button>
+        <button class="tab"     data-mode="peak_daily">单日峰值</button>
+        <button class="tab"     data-mode="deaths">累计死亡</button>
+        <button class="tab"     data-mode="incidence_rate">发病率/10万</button>
+      </div>
+      <div id="c-region" class="chart" style="height:380px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🍩 各地区累计确诊占比</div>
+      <div class="card-desc">悬停查看详情</div>
+      <div id="c-pie" class="chart" style="height:428px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE: Heatmap ══════════════ -->
+<div id="p-heatmap" class="page">
+  <div class="sec">热力地图分析</div>
+  <div class="grid g-full">
+    <div class="card">
+      <div class="card-title">🔥 香港各区疫情热力地图（时间动画）</div>
+      <div class="card-desc">地图颜色深浅代表当日各区新增确诊数量；使用下方时间轴逐日回放或点击播放动画</div>
+      <div class="tabs" id="tabs-heatmap-metric">
+        <button class="tab on"  data-metric="新增确诊">新增确诊</button>
+        <button class="tab"     data-metric="累计确诊">累计确诊</button>
+        <button class="tab"     data-metric="新增死亡">新增死亡</button>
+        <button class="tab"     data-metric="发病率">发病率/10万</button>
+      </div>
+      <div id="c-heatmap-map" class="chart" style="height:500px"></div>
+      <div class="legend-strip">
+        <span>无/低</span>
+        <div class="legend-bar"></div>
+        <span>高</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 时间轴控制器（与地图页共享逻辑，独立状态） -->
+  <div class="grid g-full" style="margin-bottom:32px">
+    <div class="slider-wrap">
+      <div class="slider-head">
+        <span class="slider-label">📅 日期选择</span>
+        <span class="slider-date" id="hm-date-label">—</span>
+      </div>
+      <input type="range" id="hm-slider" min="0" value="0"/>
+      <div class="slider-ticks" id="hm-ticks"></div>
+      <div class="play-bar">
+        <button class="play-btn" id="hm-play-btn" title="播放/暂停">▶</button>
+        <span class="speed-lbl">播放速度</span>
+        <select class="speed-sel" id="hm-speed-sel">
+          <option value="600">慢速</option>
+          <option value="300" selected>正常</option>
+          <option value="100">快速</option>
+          <option value="50">极速</option>
+        </select>
+        <span class="speed-lbl" style="margin-left:auto;font-size:12px;color:var(--text2)" id="hm-progress"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 附：矩阵热力图 -->
+  <div class="grid g-full" style="margin-bottom:32px">
+    <div class="card">
+      <div class="card-title">📋 全时段热力矩阵（各区 × 日期）</div>
+      <div class="card-desc">横轴为日期，纵轴为地区；颜色越深当日新增越多</div>
+      <div id="c-heatmap" class="chart" style="height:380px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  Constants & helpers
+// ═══════════════════════════════════════════════════════
+const C = {
+  red:'#f85149', orange:'#e09b3e', yellow:'#d29922', green:'#3fb950',
+  teal:'#39d0d8', blue:'#58a6ff', purple:'#bc8cff', grey:'#8b949e',
+  border:'#30363d', text:'#e6edf3', text2:'#8b949e', surface:'#1c2128',
+};
+const REGION_COLORS = [
+  '#58a6ff','#3fb950','#f85149','#d29922','#bc8cff',
+  '#39d0d8','#e09b3e','#ff7b72','#79c0ff','#a5d6ff','#ffa657','#d2a8ff',
+];
+const MAP_GRADIENT = ['#0d2137','#1a4a7a','#2171b5','#6baed6','#f7941d','#e55050','#c0392b'];
+
+const axisBase = {
+  axisLine:{lineStyle:{color:C.border}},
+  axisTick:{lineStyle:{color:C.border}},
+  axisLabel:{color:C.text2, fontSize:11},
+  splitLine:{lineStyle:{color:C.border, type:'dashed'}},
+};
+const ttBase = {
+  backgroundColor:C.surface, borderColor:C.border, borderWidth:1,
+  textStyle:{color:C.text, fontSize:12}, trigger:'axis',
+  axisPointer:{type:'cross', crossStyle:{color:C.text2}},
+};
+
+function n(v){
+  if(v===null||v===undefined) return '—';
+  return Number(v).toLocaleString('zh-CN');
+}
+function fmt(v){
+  if(v>=10000) return (v/10000).toFixed(1)+'万';
+  if(v>=1000)  return (v/1000).toFixed(1)+'k';
+  return v;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart instances
+// ═══════════════════════════════════════════════════════
+const charts = {};
+['daily','cumulative','region','pie','trend','risk','heatmap','heatmap-map','map','dp-spark']
+  .forEach(id => {
+    const el = document.getElementById('c-'+id);
+    if(el) charts[id] = echarts.init(el, null, {renderer:'canvas'});
+  });
+
+window.addEventListener('resize', ()=>Object.values(charts).forEach(c=>c.resize()));
+
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let DAILY=null, REGION=null, RISK=null, HEATMAP=null, TREND=null, FORECAST=null;
+let MAP_DATES=[];
+let mapMetric='新增确诊', mapDateIdx=0;
+let dailyMode='cases', regionMode='cumulative';
+let playTimer=null;
+let hmMetric='新增确诊', hmDateIdx=0, hmPlayTimer=null;
+
+// ═══════════════════════════════════════════════════════
+//  Boot – fetch all data
+// ═══════════════════════════════════════════════════════
+async function boot(){
+  try {
+    const [summary, daily, regions, risk, heatmap, trend, mapDates, geoJson, forecast] = await Promise.all([
+      fetch('/api/summary').then(r=>r.json()),
+      fetch('/api/daily').then(r=>r.json()),
+      fetch('/api/regions').then(r=>r.json()),
+      fetch('/api/risk').then(r=>r.json()),
+      fetch('/api/heatmap').then(r=>r.json()),
+      fetch('/api/region_trend').then(r=>r.json()),
+      fetch('/api/map_dates').then(r=>r.json()),
+      fetch('/static/hk_districts.json').then(r=>r.json()),
+      fetch('/api/forecast').then(r=>r.json()).catch(()=>null),
+    ]);
+
+    // KPI
+    document.getElementById('k-total').textContent     = n(summary.total_confirmed);
+    document.getElementById('k-peak').textContent      = n(summary.peak_daily);
+    document.getElementById('k-death').textContent     = n(summary.total_death);
+    document.getElementById('k-recovered').textContent = n(summary.total_recovered);
+    document.getElementById('k-regions').textContent   = summary.regions + ' 个';
+    document.getElementById('k-period').textContent    = `${summary.date_start} ~ ${summary.date_end}`;
+    document.getElementById('k-peak-date').textContent = `峰值日期 ${summary.peak_date}`;
+    document.getElementById('k-death-rate').textContent= `病死率 ${summary.death_rate}%`;
+    document.getElementById('k-days').textContent      = `共 ${summary.total_days} 天数据`;
+    document.getElementById('hdr-date').textContent    = `${summary.date_start} ~ ${summary.date_end}`;
+
+    DAILY=daily; REGION=regions; RISK=risk; HEATMAP=heatmap; TREND=trend;
+    FORECAST = (forecast && !forecast.error) ? forecast : null;
+    MAP_DATES = mapDates.dates;
+
+    // Register HK map
+    echarts.registerMap('hk', geoJson);
+
+    // Init slider
+    const slider = document.getElementById('date-slider');
+    slider.max = MAP_DATES.length - 1;
+    slider.value = 0;
+    buildSliderTicks();
+    updateSliderLabel(0);
+    slider.addEventListener('input', e=>{
+      mapDateIdx = parseInt(e.target.value);
+      updateSliderLabel(mapDateIdx);
+      refreshMap();
+    });
+
+    // Init heatmap-map slider
+    const hmSlider = document.getElementById('hm-slider');
+    hmSlider.max = MAP_DATES.length - 1;
+    hmSlider.value = 0;
+    buildHmTicks();
+    updateHmLabel(0);
+    hmSlider.addEventListener('input', e=>{
+      hmDateIdx = parseInt(e.target.value);
+      updateHmLabel(hmDateIdx);
+      refreshHeatmapMap();
+    });
+
+    renderDaily(); renderCumulative(); renderTrend(); renderRisk();
+    renderRegion(); renderPie(); renderHeatmap();
+    await refreshMap();
+    await refreshHeatmapMap();
+
+  } catch(e) {
+    const el = document.getElementById('err-banner');
+    el.style.display='block';
+    el.textContent='数据加载失败：'+e.message;
+    console.error(e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Map
+// ═══════════════════════════════════════════════════════
+async function refreshMap(){
+  const date = MAP_DATES[mapDateIdx];
+  const data = await fetch(`/api/map_data?date=${date}&metric=${encodeURIComponent(mapMetric)}`).then(r=>r.json());
+
+  const values = data.map(d=>d.value).filter(v=>v>0);
+  const maxVal = values.length ? Math.max(...values) : 1;
+  const minVal = 0;
+
+  charts.map.setOption({
+    backgroundColor:'transparent',
+    tooltip:{
+      trigger:'item',
+      backgroundColor:C.surface, borderColor:C.border, borderWidth:1,
+      textStyle:{color:C.text, fontSize:12},
+      formatter: p => {
+        if(!p.data) return p.name;
+        const d = p.data;
+        const riskColor = {'低风险':C.green,'中风险':C.yellow,'高风险':C.red}[d.风险等级]||C.grey;
+        return `<b style="font-size:14px">${p.name}</b>
+          <span style="background:${riskColor};color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:6px">${d.风险等级||''}</span><br/>
+          <span style="color:${C.text2}">📅 ${date}</span><br/>
+          新增确诊：<b style="color:${C.red}">${n(d.新增确诊)}</b><br/>
+          累计确诊：<b>${n(d.累计确诊)}</b><br/>
+          累计死亡：<b style="color:${C.grey}">${n(d.累计死亡)}</b><br/>
+          发病率：<b>${d.发病率?.toFixed(1)||'—'}/10万</b><br/>
+          人口：<b>${n(d.人口)}</b>`;
+      },
+    },
+    visualMap:{
+      type:'continuous',
+      min:minVal, max:maxVal||1,
+      calculable:true,
+      orient:'horizontal',
+      left:'center', bottom:10,
+      inRange:{color:MAP_GRADIENT},
+      text:['高','低'],
+      textStyle:{color:C.text2},
+    },
+    series:[{
+      type:'map', map:'hk',
+      roam:true,
+      emphasis:{
+        label:{show:true, color:C.text, fontSize:11},
+        itemStyle:{areaColor:'#ffe57f'},
+      },
+      select:{
+        label:{show:true, color:C.text},
+        itemStyle:{areaColor:'#f5c518'},
+      },
+      label:{
+        show:true,
+        formatter: p => {
+          const shortName = p.name.replace('区','');
+          return shortName;
+        },
+        color:C.text2, fontSize:9,
+      },
+      itemStyle:{
+        borderColor:C.border, borderWidth:1,
+        areaColor:'#1a2535',
+      },
+      data: data.map(d=>({
+        name:d.name, value:d.value,
+        新增确诊:d.新增确诊, 累计确诊:d.累计确诊,
+        新增死亡:d.新增死亡, 累计死亡:d.累计死亡,
+        风险等级:d.风险等级, 发病率:d.发病率, 人口:d.人口,
+      })),
+    }],
+  }, true);
+
+  // Click handler for district detail
+  charts.map.off('click');
+  charts.map.on('click', async params=>{
+    if(params.componentType==='series' && params.seriesType==='map'){
+      await showDistrictDetail(params.name, params.data, date);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  District detail panel
+// ═══════════════════════════════════════════════════════
+async function showDistrictDetail(name, data, date){
+  const series = await fetch(`/api/district_series?district=${encodeURIComponent(name)}`).then(r=>r.json());
+  const panel = document.getElementById('district-panel');
+  const risk  = data?.风险等级 || '—';
+  const riskCls = {'低风险':'低风险','中风险':'中风险','高风险':'高风险'}[risk]||'';
+
+  panel.innerHTML = `
+    <div class="dp-name">${name}</div>
+    <span class="dp-risk ${riskCls}">${risk}</span>
+    <div class="dp-stats">
+      <div class="dp-stat">
+        <div class="dp-stat-lbl">📅 当日新增确诊</div>
+        <div class="dp-stat-val" style="color:${C.red}">${n(data?.新增确诊)}</div>
+      </div>
+      <div class="dp-stat">
+        <div class="dp-stat-lbl">📈 累计确诊</div>
+        <div class="dp-stat-val">${n(data?.累计确诊)}</div>
+      </div>
+      <div class="dp-stat">
+        <div class="dp-stat-lbl">💀 累计死亡</div>
+        <div class="dp-stat-val" style="color:${C.grey}">${n(data?.累计死亡)}</div>
+      </div>
+      <div class="dp-stat">
+        <div class="dp-stat-lbl">🏥 发病率/10万</div>
+        <div class="dp-stat-val" style="color:${C.purple}">${data?.发病率?.toFixed(1)||'—'}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:${C.text2};margin-bottom:6px">📊 每日新增确诊趋势</div>
+    <div id="c-dp-spark" style="width:100%;height:130px"></div>
+  `;
+
+  // Init sparkline
+  const sparkEl = document.getElementById('c-dp-spark');
+  const spark = echarts.init(sparkEl, null, {renderer:'canvas'});
+
+  // Find current date index for markLine
+  const dateIdx = series.dates.indexOf(date);
+
+  spark.setOption({
+    backgroundColor:'transparent',
+    grid:{left:32,right:8,top:8,bottom:28},
+    tooltip:{
+      backgroundColor:C.surface, borderColor:C.border, borderWidth:1,
+      textStyle:{color:C.text, fontSize:11}, trigger:'axis',
+      formatter: ps => `<b>${ps[0].axisValue}</b><br/>${ps[0].marker}新增：<b>${n(ps[0].value)}</b>`,
+    },
+    xAxis:{...axisBase, type:'category', data:series.dates,
+           axisLabel:{...axisBase.axisLabel, fontSize:9, rotate:30, formatter:v=>v.slice(5)}},
+    yAxis:{...axisBase, type:'value', axisLabel:{...axisBase.axisLabel, fontSize:9, formatter:fmt}},
+    series:[{
+      type:'line', data:series['新增确诊'],
+      smooth:true, symbol:'none',
+      lineStyle:{color:C.red, width:1.8},
+      areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+        colorStops:[{offset:0,color:'rgba(248,81,73,.35)'},{offset:1,color:'rgba(248,81,73,.02)'}]}},
+      itemStyle:{color:C.red},
+      markLine: dateIdx>=0 ? {
+        silent:true,
+        symbol:'none',
+        lineStyle:{color:C.yellow, type:'dashed', width:1.5},
+        data:[{xAxis:dateIdx, label:{formatter:'当前', color:C.yellow, fontSize:9}}],
+      } : undefined,
+    }],
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Slider helpers
+// ═══════════════════════════════════════════════════════
+function updateSliderLabel(idx){
+  document.getElementById('map-date-label').textContent = MAP_DATES[idx]||'';
+  document.getElementById('play-progress').textContent =
+    `${idx+1} / ${MAP_DATES.length}`;
+}
+
+function buildSliderTicks(){
+  const ticks = document.getElementById('slider-ticks');
+  // Show month labels
+  const months = {};
+  MAP_DATES.forEach((d,i)=>{
+    const m = d.slice(0,7);
+    if(!months[m]) months[m]={i,label:d.slice(5,7)+'月'};
+  });
+  ticks.innerHTML = Object.values(months)
+    .map(m=>`<span>${m.label}</span>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Play / pause animation
+// ═══════════════════════════════════════════════════════
+document.getElementById('play-btn').addEventListener('click', ()=>{
+  if(playTimer){
+    clearInterval(playTimer);
+    playTimer=null;
+    document.getElementById('play-btn').textContent='▶';
+    document.getElementById('play-btn').classList.remove('playing');
+  } else {
+    document.getElementById('play-btn').textContent='⏸';
+    document.getElementById('play-btn').classList.add('playing');
+    const speed = parseInt(document.getElementById('speed-sel').value);
+    playTimer = setInterval(()=>{
+      const slider = document.getElementById('date-slider');
+      mapDateIdx = (mapDateIdx + 1) % MAP_DATES.length;
+      slider.value = mapDateIdx;
+      updateSliderLabel(mapDateIdx);
+      refreshMap();
+      if(mapDateIdx === MAP_DATES.length-1){
+        clearInterval(playTimer); playTimer=null;
+        document.getElementById('play-btn').textContent='▶';
+        document.getElementById('play-btn').classList.remove('playing');
+      }
+    }, speed);
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Daily
+// ═══════════════════════════════════════════════════════
+function renderDaily(){
+  const cfg = {
+    cases:     {bar:DAILY.new_cases,     line:DAILY.ma7,           bName:'每日新增确诊',bc:C.red,   lc:'#ff8a80'},
+    deaths:    {bar:DAILY.new_deaths,    line:DAILY.death_ma7,     bName:'每日新增死亡',bc:C.grey,  lc:'#cdd9e5'},
+    recovered: {bar:DAILY.new_recovered, line:DAILY.recovered_ma7, bName:'每日新增康复',bc:C.green, lc:'#56d364'},
+  }[dailyMode];
+
+  const histLen = DAILY.dates.length;
+  const showFC = dailyMode === 'cases' && FORECAST != null;
+  let dates   = [...DAILY.dates];
+  let barData = [...cfg.bar];
+  let linData = [...cfg.line];
+  let fcSeries = [];
+
+  if(showFC){
+    dates   = [...DAILY.dates, ...FORECAST.forecast_dates];
+    barData = [...cfg.bar,  ...Array(5).fill(null)];
+    linData = [...cfg.line, ...Array(5).fill(null)];
+
+    const lastVal = cfg.bar[histLen - 1] ?? 0;
+
+    // Forecast line anchored at last historical point
+    const fcLine = [...Array(histLen - 1).fill(null), lastVal, ...FORECAST.forecast];
+
+    // CI band: lower base (invisible) + upper-lower height (visible)
+    const ciLow  = [...Array(histLen).fill(null), ...FORECAST.lower];
+    const ciBand = [...Array(histLen).fill(null),
+                    ...FORECAST.upper.map((u, i) => Math.max(0, u - FORECAST.lower[i]))];
+
+    fcSeries = [
+      {
+        name:'_ci_base', type:'line', data:ciLow,
+        stack:'ci', symbol:'none',
+        lineStyle:{opacity:0}, areaStyle:{color:'transparent'},
+        legendHoverLink:false, tooltip:{show:false},
+      },
+      {
+        name:'95%置信区间', type:'line', data:ciBand,
+        stack:'ci', symbol:'none',
+        lineStyle:{opacity:0},
+        areaStyle:{color:'rgba(255,193,7,0.18)'},
+        legendHoverLink:false, tooltip:{show:false},
+      },
+      {
+        name:'ARIMA(5,1,5)预测', type:'line', data:fcLine,
+        connectNulls:false, symbol:'circle', symbolSize:5,
+        lineStyle:{color:C.yellow, width:2.2, type:'dashed'},
+        itemStyle:{color:C.yellow},
+        markLine:{
+          silent:true, symbol:'none',
+          lineStyle:{color:'rgba(210,153,34,0.45)', type:'solid', width:1},
+          data:[{
+            xAxis: DAILY.dates[histLen - 1],
+            label:{formatter:'预测起始', color:C.yellow, fontSize:9, position:'insideEndTop'},
+          }],
+        },
+      },
+    ];
+  }
+
+  charts.daily.setOption({
+    backgroundColor:'transparent',
+    tooltip:{...ttBase, formatter:ps=>{
+      let s=`<b>${ps[0].axisValue}</b><br/>`;
+      const isFcDate = showFC && FORECAST.forecast_dates.includes(ps[0].axisValue);
+      ps.forEach(p=>{
+        if(p.value===null) return;
+        if(p.seriesName==='_ci_base'||p.seriesName==='95%置信区间') return;
+        s+=`${p.marker}${p.seriesName}：<b>${n(p.value)}</b><br/>`;
+      });
+      if(isFcDate){
+        const fi = FORECAST.forecast_dates.indexOf(ps[0].axisValue);
+        s+=`<span style="color:${C.text2};font-size:10px">95% CI：${Math.round(FORECAST.lower[fi])} ~ ${Math.round(FORECAST.upper[fi])}</span>`;
+      }
+      return s;
+    }},
+    legend:{
+      top:0,right:0,textStyle:{color:C.text2},
+      data: showFC
+        ? [cfg.bName,'7日均线','ARIMA(5,1,5)预测','95%置信区间']
+        : [cfg.bName,'7日均线'],
+    },
+    grid:{left:52,right:18,top:34,bottom:42},
+    xAxis:{...axisBase,type:'category',data:dates,
+           axisLabel:{...axisBase.axisLabel,rotate:30,formatter:v=>v.slice(5)}},
+    yAxis:{...axisBase,type:'value',axisLabel:{...axisBase.axisLabel,formatter:fmt}},
+    dataZoom:[
+      {type:'inside',start:0,end:100},
+      {type:'slider',height:18,bottom:2,borderColor:C.border,
+       fillerColor:'rgba(88,166,255,.1)',handleStyle:{color:C.blue},
+       textStyle:{color:C.text2}},
+    ],
+    series:[
+      ...fcSeries,
+      {name:cfg.bName,type:'bar',data:barData,
+       itemStyle:{color:cfg.bc,opacity:.75},barMaxWidth:8},
+      {name:'7日均线',type:'line',data:linData,
+       smooth:true,symbol:'none',connectNulls:false,
+       lineStyle:{color:cfg.lc,width:2.5},itemStyle:{color:cfg.lc}},
+    ],
+  }, true);
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Cumulative
+// ═══════════════════════════════════════════════════════
+function renderCumulative(){
+  charts.cumulative.setOption({
+    backgroundColor:'transparent',
+    tooltip:{...ttBase,formatter:ps=>{
+      let s=`<b>${ps[0].axisValue}</b><br/>`;
+      ps.forEach(p=>s+=`${p.marker}${p.seriesName}：<b>${n(p.value)}</b><br/>`);
+      return s;
+    }},
+    legend:{bottom:0,textStyle:{color:C.text2},icon:'roundRect'},
+    grid:{left:58,right:56,top:18,bottom:50},
+    xAxis:{...axisBase,type:'category',data:DAILY.dates,
+           axisLabel:{...axisBase.axisLabel,rotate:30,formatter:v=>v.slice(5)}},
+    yAxis:[
+      {...axisBase,type:'value',name:'确诊',nameTextStyle:{color:C.text2},
+       axisLabel:{...axisBase.axisLabel,formatter:fmt}},
+      {...axisBase,type:'value',name:'死亡',nameTextStyle:{color:C.text2},
+       splitLine:{show:false},axisLabel:{...axisBase.axisLabel}},
+    ],
+    series:[
+      {name:'累计确诊',type:'line',data:DAILY.cumulative,yAxisIndex:0,
+       smooth:true,symbol:'none',
+       lineStyle:{color:C.teal,width:2.5},
+       areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+         colorStops:[{offset:0,color:'rgba(57,208,216,.38)'},{offset:1,color:'rgba(57,208,216,.02)'}]}},
+       itemStyle:{color:C.teal}},
+      {name:'累计死亡',type:'line',data:DAILY.cumulative_deaths,yAxisIndex:1,
+       smooth:true,symbol:'none',
+       lineStyle:{color:C.grey,width:2,type:'dashed'},
+       itemStyle:{color:C.grey}},
+    ],
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Region bar
+// ═══════════════════════════════════════════════════════
+function renderRegion(){
+  const lbl={cumulative:'累计确诊',peak_daily:'单日峰值',deaths:'累计死亡',incidence_rate:'发病率/10万'}[regionMode];
+  const raw=REGION[regionMode];
+  const sorted=REGION.names.map((nm,i)=>({nm,v:raw[i]})).sort((a,b)=>a.v-b.v);
+  const palette=sorted.map((_,i)=>{
+    const t=i/Math.max(sorted.length-1,1);
+    return `hsl(${220-t*180},${55+t*30}%,${30+t*35}%)`;
+  });
+  charts.region.setOption({
+    backgroundColor:'transparent',
+    tooltip:{...ttBase,trigger:'axis',axisPointer:{type:'shadow'},
+      formatter:p=>`<b>${p[0].name}</b><br/>${p[0].marker}${lbl}：<b>${n(p[0].value)}</b>`},
+    grid:{left:72,right:64,top:8,bottom:16},
+    xAxis:{...axisBase,type:'value',axisLabel:{...axisBase.axisLabel,formatter:fmt}},
+    yAxis:{...axisBase,type:'category',data:sorted.map(d=>d.nm),
+           axisLabel:{...axisBase.axisLabel,fontSize:11}},
+    series:[{
+      name:lbl,type:'bar',
+      data:sorted.map((d,i)=>({value:d.v,itemStyle:{color:palette[i]}})),
+      label:{show:true,position:'right',color:C.text2,fontSize:10,
+             formatter:p=>regionMode==='incidence_rate'?p.value.toFixed(1):n(p.value)},
+      barMaxWidth:18,
+    }],
+  }, true);
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Pie
+// ═══════════════════════════════════════════════════════
+function renderPie(){
+  charts.pie.setOption({
+    backgroundColor:'transparent',
+    tooltip:{
+      backgroundColor:C.surface,borderColor:C.border,borderWidth:1,
+      textStyle:{color:C.text,fontSize:12},
+      formatter:p=>`<b>${p.name}</b><br/>累计确诊：<b>${n(p.value)}</b><br/>占比：<b>${p.percent}%</b>`,
+    },
+    legend:{type:'scroll',orient:'vertical',right:6,top:'center',
+      textStyle:{color:C.text2,fontSize:11},pageTextStyle:{color:C.text2}},
+    series:[{
+      type:'pie',radius:['42%','70%'],center:['38%','50%'],
+      avoidLabelOverlap:true,
+      itemStyle:{borderColor:C.border,borderWidth:1.5},
+      label:{show:false},
+      emphasis:{label:{show:true,fontSize:13,fontWeight:'bold',color:C.text},
+                itemStyle:{shadowBlur:12,shadowColor:'rgba(0,0,0,.5)'}},
+      data:REGION.names.map((nm,i)=>({
+        name:nm, value:REGION.cumulative[i],
+        itemStyle:{color:REGION_COLORS[i%REGION_COLORS.length]},
+      })),
+    }],
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Trend (Top 6)
+// ═══════════════════════════════════════════════════════
+function renderTrend(){
+  charts.trend.setOption({
+    backgroundColor:'transparent',
+    tooltip:{...ttBase,formatter:ps=>{
+      let s=`<b>${ps[0].axisValue}</b><br/>`;
+      ps.filter(p=>p.value>0).sort((a,b)=>b.value-a.value)
+        .forEach(p=>s+=`${p.marker}${p.seriesName}：<b>${n(p.value)}</b><br/>`);
+      return s;
+    }},
+    legend:{type:'scroll',bottom:0,textStyle:{color:C.text2},icon:'roundRect',itemWidth:14,itemHeight:10},
+    grid:{left:48,right:16,top:16,bottom:48},
+    xAxis:{...axisBase,type:'category',data:TREND.dates,
+           axisLabel:{...axisBase.axisLabel,rotate:30,formatter:v=>v.slice(5)}},
+    yAxis:{...axisBase,type:'value',axisLabel:{...axisBase.axisLabel,formatter:fmt}},
+    series:TREND.regions.map((r,i)=>({
+      name:r,type:'line',data:TREND.series[r],
+      smooth:true,symbol:'none',
+      lineStyle:{color:REGION_COLORS[i],width:2},
+      itemStyle:{color:REGION_COLORS[i]},
+    })),
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Risk
+// ═══════════════════════════════════════════════════════
+function renderRisk(){
+  const riskColor={'低风险':C.green,'中风险':C.yellow,'高风险':C.red};
+  charts.risk.setOption({
+    backgroundColor:'transparent',
+    tooltip:{...ttBase,formatter:ps=>{
+      let s=`<b>${ps[0].axisValue}</b><br/>`;
+      ps.forEach(p=>s+=`${p.marker}${p.seriesName}：<b>${p.value} 区</b><br/>`);
+      return s;
+    }},
+    legend:{bottom:0,textStyle:{color:C.text2},icon:'roundRect'},
+    grid:{left:36,right:14,top:14,bottom:48},
+    xAxis:{...axisBase,type:'category',data:RISK.dates,
+           axisLabel:{...axisBase.axisLabel,rotate:30,formatter:v=>v.slice(5)}},
+    yAxis:{...axisBase,type:'value',max:18,
+           axisLabel:{...axisBase.axisLabel,formatter:v=>v+'区'}},
+    series:['低风险','中风险','高风险'].map(lv=>({
+      name:lv,type:'line',stack:'risk',data:RISK[lv]||[],
+      smooth:true,symbol:'none',
+      lineStyle:{color:riskColor[lv],width:2},
+      areaStyle:{color:riskColor[lv],opacity:.22},
+      itemStyle:{color:riskColor[lv]},
+    })),
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Heatmap map (choropleth on map)
+// ═══════════════════════════════════════════════════════
+async function refreshHeatmapMap(){
+  const date = MAP_DATES[hmDateIdx];
+  const data = await fetch(`/api/map_data?date=${date}&metric=${encodeURIComponent(hmMetric)}`).then(r=>r.json());
+  const values = data.map(d=>d.value).filter(v=>v>0);
+  const maxVal = values.length ? Math.max(...values) : 1;
+
+  // Compute global max for cumulative metrics so color scale stays stable
+  charts['heatmap-map'].setOption({
+    backgroundColor:'transparent',
+    title:{
+      text: date,
+      textStyle:{color:C.text2, fontSize:13, fontWeight:'normal'},
+      right:16, top:10,
+    },
+    tooltip:{
+      trigger:'item',
+      backgroundColor:C.surface, borderColor:C.border, borderWidth:1,
+      textStyle:{color:C.text, fontSize:12},
+      formatter: p => {
+        if(!p.data) return `<b>${p.name}</b><br/><span style="color:${C.text2}">暂无数据</span>`;
+        const d = p.data;
+        const riskColor = {'低风险':C.green,'中风险':C.yellow,'高风险':C.red}[d.风险等级]||C.grey;
+        const metricLabel = hmMetric==='发病率' ? '发病率/10万' : hmMetric;
+        return `<b style="font-size:14px">${p.name}</b>
+          <span style="background:${riskColor};color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:6px">${d.风险等级||''}</span><br/>
+          <span style="color:${C.text2}">${metricLabel}：</span><b style="color:${C.red}">${n(d.value)}</b><br/>
+          新增确诊：<b>${n(d.新增确诊)}</b><br/>
+          累计确诊：<b>${n(d.累计确诊)}</b><br/>
+          累计死亡：<b>${n(d.累计死亡)}</b>`;
+      },
+    },
+    visualMap:{
+      type:'continuous',
+      min:0, max:maxVal||1,
+      calculable:true,
+      orient:'horizontal',
+      left:'center', bottom:8,
+      inRange:{color:['#0f2544','#1a4a7a','#2171b5','#74b9e0','#f7941d','#e55050','#c0392b']},
+      text:['高','低'],
+      textStyle:{color:C.text2},
+    },
+    series:[{
+      type:'map', map:'hk',
+      roam:true,
+      zoom:1.1,
+      emphasis:{
+        label:{show:true, color:'#fff', fontSize:11, fontWeight:'bold'},
+        itemStyle:{areaColor:'#ffe57f', borderColor:'#fff', borderWidth:1.5},
+      },
+      label:{
+        show:true,
+        formatter: p => p.name.replace('区',''),
+        color:'rgba(230,237,243,0.7)', fontSize:9,
+      },
+      itemStyle:{
+        borderColor:'rgba(255,255,255,0.15)', borderWidth:1,
+        areaColor:'#1a2535',
+      },
+      data: data.map(d=>({
+        name:d.name, value:d.value,
+        新增确诊:d.新增确诊, 累计确诊:d.累计确诊,
+        新增死亡:d.新增死亡, 累计死亡:d.累计死亡,
+        风险等级:d.风险等级,
+      })),
+    }],
+  }, true);
+}
+
+function buildHmTicks(){
+  const ticks = document.getElementById('hm-ticks');
+  const months = {};
+  MAP_DATES.forEach((d,i)=>{
+    const m = d.slice(0,7);
+    if(!months[m]) months[m]={i, label:d.slice(5,7)+'月'};
+  });
+  ticks.innerHTML = Object.values(months).map(m=>`<span>${m.label}</span>`).join('');
+}
+function updateHmLabel(idx){
+  document.getElementById('hm-date-label').textContent = MAP_DATES[idx]||'';
+  document.getElementById('hm-progress').textContent = `${idx+1} / ${MAP_DATES.length}`;
+}
+
+document.getElementById('hm-play-btn').addEventListener('click', ()=>{
+  if(hmPlayTimer){
+    clearInterval(hmPlayTimer); hmPlayTimer=null;
+    document.getElementById('hm-play-btn').textContent='▶';
+    document.getElementById('hm-play-btn').classList.remove('playing');
+  } else {
+    document.getElementById('hm-play-btn').textContent='⏸';
+    document.getElementById('hm-play-btn').classList.add('playing');
+    const speed = parseInt(document.getElementById('hm-speed-sel').value);
+    hmPlayTimer = setInterval(()=>{
+      const slider = document.getElementById('hm-slider');
+      hmDateIdx = (hmDateIdx + 1) % MAP_DATES.length;
+      slider.value = hmDateIdx;
+      updateHmLabel(hmDateIdx);
+      refreshHeatmapMap();
+      if(hmDateIdx === MAP_DATES.length-1){
+        clearInterval(hmPlayTimer); hmPlayTimer=null;
+        document.getElementById('hm-play-btn').textContent='▶';
+        document.getElementById('hm-play-btn').classList.remove('playing');
+      }
+    }, speed);
+  }
+});
+
+wireTab('tabs-heatmap-metric', metric=>{
+  hmMetric = metric==='发病率/10万' ? '发病率' : metric;
+  refreshHeatmapMap();
+});
+
+// ═══════════════════════════════════════════════════════
+//  Chart: Heatmap matrix
+// ═══════════════════════════════════════════════════════
+function renderHeatmap(){
+  const maxVal=Math.max(...HEATMAP.data.map(d=>d[2]));
+  charts.heatmap.setOption({
+    backgroundColor:'transparent',
+    tooltip:{
+      backgroundColor:C.surface,borderColor:C.border,borderWidth:1,
+      textStyle:{color:C.text,fontSize:12},trigger:'item',
+      formatter:p=>`<b>${HEATMAP.dates[p.data[0]]}</b><br/>${HEATMAP.regions[p.data[1]]}：<b>${n(p.data[2])}</b> 例`,
+    },
+    grid:{left:72,right:110,top:8,bottom:64},
+    xAxis:{...axisBase,type:'category',data:HEATMAP.dates,splitArea:{show:false},
+           axisLabel:{...axisBase.axisLabel,rotate:45,interval:13,formatter:v=>v.slice(5)}},
+    yAxis:{...axisBase,type:'category',data:HEATMAP.regions,splitArea:{show:false},
+           axisLabel:{...axisBase.axisLabel,fontSize:11}},
+    visualMap:{min:1,max:maxVal,calculable:true,orient:'vertical',right:8,top:'center',
+      inRange:{color:MAP_GRADIENT},textStyle:{color:C.text2}},
+    series:[{
+      type:'heatmap',data:HEATMAP.data,
+      itemStyle:{borderColor:'#0d1117',borderWidth:.5},
+      emphasis:{itemStyle:{shadowBlur:10,shadowColor:'rgba(0,0,0,.5)'}},
+    }],
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Tab wiring
+// ═══════════════════════════════════════════════════════
+function wireTab(groupId, onChange){
+  document.getElementById(groupId).addEventListener('click', e=>{
+    const btn=e.target.closest('.tab');
+    if(!btn) return;
+    document.querySelectorAll(`#${groupId} .tab`).forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    onChange(btn.dataset.mode || btn.dataset.metric);
+  });
+}
+
+wireTab('tabs-daily', mode=>{ dailyMode=mode; if(DAILY) renderDaily(); });
+wireTab('tabs-region', mode=>{ regionMode=mode; if(REGION) renderRegion(); });
+wireTab('tabs-map', metric=>{
+  mapMetric = metric==='发病率/10万' ? '发病率' : metric;
+  refreshMap();
+});
+
+// ═══════════════════════════════════════════════════════
+//  Page nav wiring
+// ═══════════════════════════════════════════════════════
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById(btn.dataset.page).classList.add('on');
+    // Resize charts on page switch
+    setTimeout(()=>Object.values(charts).forEach(c=>c.resize()), 50);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  Start
+// ═══════════════════════════════════════════════════════
+boot();
+</script>
+</body>
+</html>
